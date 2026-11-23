@@ -1,0 +1,52 @@
+name: Eververse Daily Reset Check
+
+on:
+  schedule:
+    - cron: "15 17 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch-eververse:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Fetch Eververse inventory & send push alert
+        env:
+          BUNGIE_API_KEY: ${{ secrets.BUNGIE_API_KEY }}
+          BUNGIE_CLIENT_ID: ${{ secrets.BUNGIE_CLIENT_ID }}
+          BUNGIE_CLIENT_SECRET: ${{ secrets.BUNGIE_CLIENT_SECRET }}
+          BUNGIE_REFRESH_TOKEN: ${{ secrets.BUNGIE_REFRESH_TOKEN }}
+          DESTINY_MEMBERSHIP_TYPE: ${{ secrets.DESTINY_MEMBERSHIP_TYPE }}
+          DESTINY_MEMBERSHIP_ID: ${{ secrets.DESTINY_MEMBERSHIP_ID }}
+          DESTINY_CHARACTER_IDS: ${{ secrets.DESTINY_CHARACTER_IDS }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python fetch_eververse.py
+
+      - name: Rotate Bungie refresh token secret
+        if: env.NEW_REFRESH_TOKEN != ''
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: gh secret set BUNGIE_REFRESH_TOKEN --body "$NEW_REFRESH_TOKEN"
+
+      - name: Commit updated Eververse store data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/eververse.json manifest_cache.json
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -m "Update Eververse inventory"
+            git push
+          fi
