@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0f131a" />
+  <title>Eververse Store</title>
+  <style>
+    :root {
+      --bg: #0f131a;
+      --card: #181f2c;
+      --border: #2a3447;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --bd: #67e8f9;
+      --silver: #cbd5e1;
+      --accent: #38bdf8;
+      --owned: #4ade80;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 16px 14px 48px;
+    }
+    header {
+      max-width: 720px;
+      margin: 0 auto 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    h1 { font-size: 1.35rem; margin: 0; letter-spacing: 0.4px; }
+    .updated { font-size: 0.8rem; color: var(--muted); }
+    .controls {
+      max-width: 720px;
+      margin: 0 auto 16px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .controls input, .controls select {
+      width: 100%;
+      padding: 9px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #0f131a;
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+    .full-width { grid-column: 1 / -1; }
+    .toggle-row {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      color: var(--muted);
+      padding-top: 2px;
+    }
+    .stats {
+      max-width: 720px;
+      margin: 0 auto 10px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .grid {
+      max-width: 720px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      transition: opacity 0.2s ease;
+    }
+    .card.owned {
+      opacity: 0.48;
+      filter: grayscale(45%);
+    }
+    .icon-wrap {
+      position: relative;
+      width: 56px;
+      height: 56px;
+      flex-shrink: 0;
+    }
+    .icon-wrap img {
+      width: 56px;
+      height: 56px;
+      border-radius: 8px;
+      background: #0b0e14;
+      object-fit: cover;
+    }
+    .tick {
+      position: absolute;
+      bottom: -4px;
+      right: -4px;
+      background: #14532d;
+      color: var(--owned);
+      border: 1px solid var(--owned);
+      border-radius: 999px;
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+    .info { flex: 1; min-width: 0; }
+    .name {
+      font-weight: 600;
+      font-size: 0.98rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .meta {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+    .price {
+      text-align: right;
+      font-weight: 700;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    .price.bd { color: var(--bd); }
+    .price.silver { color: var(--silver); }
+    .price small { display: block; font-weight: 400; font-size: 0.72rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Eververse Store</h1>
+    <span class="updated" id="updatedAt">Loading...</span>
+  </header>
+
+  <section class="controls">
+    <input class="full-width" type="search" id="searchInput" placeholder="Search items (shader, ornament, emote...)" />
+
+    <select id="currencyFilter">
+      <option value="Bright Dust">Bright Dust Only</option>
+      <option value="ALL">All Currencies</option>
+      <option value="Silver">Silver Only</option>
+    </select>
+
+    <select id="classFilter">
+      <option value="ALL">All Classes</option>
+      <option value="Titan">Titan</option>
+      <option value="Hunter">Hunter</option>
+      <option value="Warlock">Warlock</option>
+      <option value="All Classes">Universal / Account</option>
+    </select>
+
+    <select class="full-width" id="categoryFilter">
+      <option value="ALL">All Store Tabs</option>
+    </select>
+
+    <label class="toggle-row">
+      <span>Show already owned items (shaded with ✓)</span>
+      <input type="checkbox" id="showOwnedToggle" checked />
+    </label>
+  </section>
+
+  <div class="stats" id="statsBar"></div>
+  <main class="grid" id="itemGrid"></main>
+
+  <script>
+    const PREFS_KEY = "ev_ping_prefs_v1";
+    const els = {
+      search: document.getElementById("searchInput"),
+      currency: document.getElementById("currencyFilter"),
+      classType: document.getElementById("classFilter"),
+      category: document.getElementById("categoryFilter"),
+      showOwned: document.getElementById("showOwnedToggle"),
+      grid: document.getElementById("itemGrid"),
+      stats: document.getElementById("statsBar"),
+      updated: document.getElementById("updatedAt"),
+    };
+
+    let allItems = [];
+
+    function loadPrefs() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}");
+        if (saved.currency) els.currency.value = saved.currency;
+        if (saved.classType) els.classType.value = saved.classType;
+        if (typeof saved.showOwned === "boolean") els.showOwned.checked = saved.showOwned;
+      } catch (_) {}
+    }
+
+    function savePrefs() {
+      localStorage.setItem(PREFS_KEY, JSON.stringify({
+        currency: els.currency.value,
+        classType: els.classType.value,
+        showOwned: els.showOwned.checked,
+      }));
+    }
+
+    function render() {
+      savePrefs();
+      const q = els.search.value.trim().toLowerCase();
+      const curr = els.currency.value;
+      const cls = els.classType.value;
+      const cat = els.category.value;
+      const showOwned = els.showOwned.checked;
+
+      const filtered = allItems.filter(item => {
+        if (!showOwned && item.owned) return false;
+        if (curr !== "ALL" && item.currency !== curr) return false;
+        if (cls !== "ALL" && item.classType !== cls) return false;
+        if (cat !== "ALL" && item.category !== cat) return false;
+        if (q && !(`${item.name} ${item.itemType} ${item.category}`.toLowerCase().includes(q))) return false;
+        return true;
+      });
+
+      const unownedCount = filtered.filter(i => !i.owned).length;
+      els.stats.textContent = `Showing ${filtered.length} items (${unownedCount} unowned)`;
+
+      els.grid.innerHTML = filtered.map(item => `
+        <article class="card ${item.owned ? "owned" : ""}">
+          <div class="icon-wrap">
+            <img src="${item.icon || ""}" alt="" loading="lazy" />
+            ${item.owned ? '<span class="tick" title="Already Owned">✓</span>' : ""}
+          </div>
+          <div class="info">
+            <div class="name">${item.name}</div>
+            <div class="meta">${item.itemType} • ${item.classType} • ${item.category}</div>
+          </div>
+          <div class="price ${item.currency === "Bright Dust" ? "bd" : "silver"}">
+            ${item.cost > 0 ? item.cost.toLocaleString() : "Free"}
+            <small>${item.currency}</small>
+          </div>
+        </article>
+      `).join("");
+    }
+
+    async function init() {
+      loadPrefs();
+      const res = await fetch(`./eververse.json?t=${Date.now()}`);
+      const data = await res.json();
+      els.updated.textContent = `Updated ${data.updatedAt}`;
+      allItems = data.items || [];
+
+      const categories = [...new Set(allItems.map(i => i.category))];
+      categories.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c;
+        opt.textContent = c;
+        els.category.appendChild(opt);
+      });
+
+      [els.search, els.currency, els.classType, els.category, els.showOwned]
+        .forEach(el => el.addEventListener("input", render));
+
+      render();
+    }
+
+    init().catch(() => {
+      els.updated.textContent = "Waiting for first sync...";
+    });
+  </script>
+</body>
+</html>
